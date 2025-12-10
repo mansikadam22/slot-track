@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-
 import '../utils/auth_storage.dart';
 
 class HomePage extends StatefulWidget {
@@ -15,6 +14,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final PageController _pageController = PageController();
+  final ScrollController _scrollController = ScrollController();   // ADDED
+  final GlobalKey _notificationKey = GlobalKey();                 // ADDED
+
   int currentPage = 0;
   List notifications = [];
   bool isLoadingNotifications = true;
@@ -53,6 +55,7 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     sliderTimer?.cancel();
     _pageController.dispose();
+    _scrollController.dispose(); // ADDED
     super.dispose();
   }
 
@@ -62,15 +65,10 @@ class _HomePageState extends State<HomePage> {
 
     setState(() {
       isGuest = guestStatus;
-      role = isGuest ? null : profile?['role']; // <-- ignore API role for guest
+      role = isGuest ? null : profile?['role'];
       isProfileLoaded = true;
     });
-
-    print("Loaded user profile:");
-    print("Role: $role");
-    print("Is guest: $isGuest");
   }
-
 
   Future<void> fetchNotifications() async {
     final data = await ApiService.getNotifications();
@@ -84,7 +82,8 @@ class _HomePageState extends State<HomePage> {
     String name = '';
     String message = '';
     String startDate = DateTime.now().toIso8601String();
-    String endDate = DateTime.now().add(const Duration(days: 1)).toIso8601String();
+    String endDate =
+    DateTime.now().add(const Duration(days: 1)).toIso8601String();
 
     showDialog(
       context: context,
@@ -104,7 +103,9 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () async {
               final success = await ApiService.addNotification(
@@ -138,10 +139,13 @@ class _HomePageState extends State<HomePage> {
           onChanged: (val) => message = val,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () async {
-              final success = await ApiService.updateNotification(item["id"], {"message": message});
+              final success = await ApiService.updateNotification(
+                  item["id"], {"message": message});
               if (success) {
                 fetchNotifications();
                 Navigator.pop(ctx);
@@ -159,6 +163,17 @@ class _HomePageState extends State<HomePage> {
     if (success) fetchNotifications();
   }
 
+  // ------------------ SCROLL FUNCTION -------------------
+  void _scrollToNotifications() {
+    if (_notificationKey.currentContext == null) return;
+
+    Scrollable.ensureVisible(
+      _notificationKey.currentContext!,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -168,6 +183,7 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
+        controller: _scrollController, // ADDED
         child: Column(
           children: [
             _buildTopSlider(),
@@ -237,10 +253,15 @@ class _HomePageState extends State<HomePage> {
         children: [
           const StatusTile(icon: Icons.circle, text: "Active: 3"),
           const StatusTile(icon: Icons.crop_square, text: "Total: 4"),
-          const StatusTile(icon: Icons.directions_car, text: "Cars: 12"),
-          StatusTile(
-            icon: Icons.notifications,
-            text: "Alerts: ${notifications.length}",
+          const StatusTile(icon: Icons.directions_car, text: "Cars: 4"),
+
+          // ---------- ALERTS (CLICKABLE) ----------
+          GestureDetector(
+            onTap: _scrollToNotifications, // ADDED
+            child: StatusTile(
+              icon: Icons.notifications,
+              text: "Alerts: ${notifications.length}",
+            ),
           ),
         ],
       ),
@@ -296,92 +317,134 @@ class _HomePageState extends State<HomePage> {
     }
 
     return Padding(
+      key: _notificationKey, // 🔥 SCROLL TARGET
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (isAdmin)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: ElevatedButton(
-                onPressed: showAddNotificationDialog,
-                child: const Text("Add Notification"),
-              ),
-            ),
-          isLoadingNotifications
-              ? Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3))
-              ],
-            ),
-            child: const Text(
-              "Loading notifications...",
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF003780)),
-            ),
-          )
-              : notifications.isEmpty
-              ? Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3))
-              ],
-            ),
-            child: const Text(
-              "No notifications available",
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF003780)),
-            ),
-          )
-              : Column(
-            children: notifications.map((item) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3))
-                  ],
+          // ---------- HEADER: Notifications + Add Button ----------
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Notifications",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF003780),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.info, color: primaryBlue, size: 28),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            item["message"] ?? "",
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF003780)),
+              ),
+
+              if (isAdmin)
+                InkWell(
+                  onTap: showAddNotificationDialog,
+                  child: const Icon(
+                    Icons.add_circle_outline,
+                    size: 28,
+                  ),
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // ---------- LOADING ----------
+          if (isLoadingNotifications)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text(
+                "Loading notifications...",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF003780),
+                ),
+              ),
+            )
+
+          // ---------- EMPTY ----------
+          else if (notifications.isEmpty)
+            Center(
+              child: const Text(
+                "No notifications available",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF003780),
+                ),
+              ),
+            )
+
+          // ---------- LIST ----------
+          else
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: notifications.length,
+              itemBuilder: (context, index) {
+                final item = notifications[index];
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 8,
+                        offset: Offset(0, 3),
+                      )
+                    ],
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.notifications, color: primaryBlue, size: 28),
+                      const SizedBox(width: 12),
+
+                      // ---------- MESSAGE ----------
+                      Expanded(
+                        child: Text(
+                          item["message"] ?? "",
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF003780),
                           ),
                         ),
-                      ],
-                    ),
-                    if (isAdmin)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(onPressed: () => showUpdateNotificationDialog(item), child: const Text("Edit")),
-                          TextButton(onPressed: () => deleteNotification(item), child: const Text("Delete", style: TextStyle(color: Colors.red))),
-                        ],
                       ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
+
+                      // ---------- ACTION ICONS ----------
+                      if (isAdmin)
+                        Row(
+                          children: [
+                            InkWell(
+                              onTap: () => showUpdateNotificationDialog(item),
+                              child: const Icon(Icons.edit, color: Colors.blue),
+                            ),
+                            const SizedBox(width: 12),
+                            InkWell(
+                              onTap: () => deleteNotification(item),
+                              child: const Icon(Icons.delete, color: Colors.red),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
         ],
       ),
     );
   }
+
 }
 
 // ------------------------ STATUS TILE ------------------------
