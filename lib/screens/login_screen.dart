@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import '../utils/auth_storage.dart';
+import '../screens/slot_page.dart';   // <-- ADD THIS IMPORT
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -100,7 +101,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
 
-
                     child: FormBuilder(
                       key: _formKey,
                       child: Column(
@@ -177,7 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(30),
                         ),
                       ),
-                      onPressed:handleLogin,
+                      onPressed: handleLogin,
                       child: const Text(
                         'Login',
                         style: TextStyle(
@@ -211,11 +211,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: () async {
                         await AuthStorage.setGuest(true);
 
-
+                        // 🟢 FIX: GUEST GOES ONLY TO SLOT PAGE
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => const HomeScreen()),
+                              builder: (context) => const Slotpage()),
                         );
                       },
                       child: const Text(

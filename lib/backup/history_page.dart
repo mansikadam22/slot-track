@@ -1,59 +1,13 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
-import 'dart:async';
 
-class HistoryReportsPage extends StatefulWidget {
+class HistoryReportsPage extends StatelessWidget {
   const HistoryReportsPage({super.key});
 
-  @override
-  State<HistoryReportsPage> createState() => _HistoryReportsPageState();
-}
-
-class _HistoryReportsPageState extends State<HistoryReportsPage> {
-  Map<String, dynamic>? historyData;
-  bool isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    fetchHistoryData();
-  }
-
-  Future<void> fetchHistoryData() async {
-    try {
-      final response = await ApiService.getHistoryReports();
-      setState(() {
-        historyData = response;
-        isLoading = false;
-      });
-    } catch (e) {
-      print("Error fetching history data: $e");
-      setState(() => isLoading = false);
-    }
-  }
+  final Color primaryBlue = const Color(0xFF4A90E2);
+  final Color softGray = const Color(0xFFF2F4F7);
 
   @override
   Widget build(BuildContext context) {
-    final Color softGray = const Color(0xFFF2F4F7);
-
-    if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (historyData == null) {
-      return const Scaffold(
-        body: Center(child: Text("Failed to load data")),
-      );
-    }
-
-    final todaySummary = historyData!['todaySummary'];
-    final occupancyOverview = historyData!['occupancyOverview']['bySlot'] as List;
-    final usageByHour = historyData!['usageByHour'] as List;
-    final slotAnalytics = historyData!['slotAnalytics'] as List;
-    final recentEvents = historyData!['recentEvents'] as List;
-
     return Scaffold(
       backgroundColor: softGray,
       appBar: AppBar(
@@ -65,6 +19,7 @@ class _HistoryReportsPageState extends State<HistoryReportsPage> {
               color: Colors.black, fontSize: 24, fontWeight: FontWeight.w600),
         ),
       ),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -76,16 +31,15 @@ class _HistoryReportsPageState extends State<HistoryReportsPage> {
             ),
             const SizedBox(height: 18),
 
-            // Summary Cards
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _summaryCard(Icons.access_time, "Peak Usage Hour", todaySummary['peakUsageHour']),
+                  _summaryCard(Icons.access_time, "Peak Usage Hour", "11 AM"),
                   const SizedBox(width: 12),
-                  _summaryCard(Icons.place, "Most Occupied", todaySummary['mostOccupiedSlot']['slotName']),
+                  _summaryCard(Icons.place, "Most Occupied", "P2"),
                   const SizedBox(width: 12),
-                  _summaryCard(Icons.calendar_today, "Events\n Today", todaySummary['eventsToday'].toString()),
+                  _summaryCard(Icons.calendar_today, "Events\n Today", "32"),
                 ],
               ),
             ),
@@ -97,9 +51,9 @@ class _HistoryReportsPageState extends State<HistoryReportsPage> {
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  SizedBox(width: 210, child: _occupancyCard(occupancyOverview)),
+                  SizedBox(width: 210, child: _occupancyCard()),
                   const SizedBox(width: 14),
-                  SizedBox(width: 210, child: _usageCard(usageByHour)),
+                  SizedBox(width: 210, child: _usageCard()),
                 ],
               ),
             ),
@@ -115,40 +69,26 @@ class _HistoryReportsPageState extends State<HistoryReportsPage> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: slotAnalytics.map<Widget>((slot) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: _slotCard(
-                        slot['slotName'],
-                        _getSlotColor(slot['label']),
-                        slot['label']),
-                  );
-                }).toList(),
+                children: [
+                  _slotCard("P1", Colors.red, "Most Occupied"),
+                  const SizedBox(width: 12),
+                  _slotCard("P2", Colors.green, "Mostly Free"),
+                  const SizedBox(width: 12),
+                  _slotCard("P3", Colors.orange, "Balanced"),
+                ],
               ),
             ),
 
             const SizedBox(height: 30),
 
-            _recentEventsSection(recentEvents),
+            _recentEventsSection(),
           ],
         ),
       ),
     );
   }
 
-  Color _getSlotColor(String label) {
-    switch (label) {
-      case "Most Occupied":
-        return Colors.red;
-      case "Mostly Free":
-        return Colors.green;
-      case "Balanced":
-        return Colors.orange;
-      default:
-        return Colors.blue;
-    }
-  }
-
+  // SUMMARY CARD
   Widget _summaryCard(IconData icon, String title, String value) {
     return Container(
       height: 150,
@@ -187,22 +127,26 @@ class _HistoryReportsPageState extends State<HistoryReportsPage> {
     );
   }
 
-  Widget _occupancyCard(List occupancy) {
-    // Compute total sum to calculate percentages
-    double total = occupancy.fold<double>(
-        0, (sum, slot) => sum + (slot['value'] is num ? (slot['value'] as num).toDouble() : 0));
 
-    List<PieSlice> slices = occupancy.map<PieSlice>((slot) {
-      double value = (slot['value'] is num ? (slot['value'] as num).toDouble() : 0);
-      double percentage = total > 0 ? (value / total) * 100 : 0; // normalize to 100%
-      return PieSlice(
-        percentage: percentage,
-        color: _getColorForSlotName(slot['slotName']),
-      );
-    }).toList();
-
+  Widget _occupancyCard() {
     return Container(
       padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFFFFF), Color(0xFFF2F5FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12.withOpacity(0.05),
+            spreadRadius: 1,
+            blurRadius: 6,
+          ),
+        ],
+      ),
+
       child: Column(
         children: [
           const Text(
@@ -210,42 +154,61 @@ class _HistoryReportsPageState extends State<HistoryReportsPage> {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
+
           SizedBox(
-            width: 140, // increased size for better visibility
-            height: 140,
+            width: 120,
+            height: 120,
             child: CustomPaint(
-              painter: MultiPieChartPainter(slices: slices),
+              painter: MultiPieChartPainter(
+                slices: [
+                  PieSlice(percentage: 40, color: Colors.red),    // P1
+                  PieSlice(percentage: 20, color: Colors.green),  // P2
+                  PieSlice(percentage: 20, color: Colors.orange), // P3
+                  PieSlice(percentage: 20, color: Colors.blue),   // P4
+                ],
+              ),
             ),
           ),
+
+          const SizedBox(height: 15),
+
+          const Text(
+            "Slot-wise Occupancy",
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+
+          const SizedBox(height: 6),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.circle, size: 10, color: Colors.red),
+              SizedBox(width: 5),
+              Text("P1"),
+              SizedBox(width: 10),
+
+              Icon(Icons.circle, size: 10, color: Colors.green),
+              SizedBox(width: 5),
+              Text("P2"),
+              SizedBox(width: 10),
+
+              Icon(Icons.circle, size: 10, color: Colors.orange),
+              SizedBox(width: 5),
+              Text("P3"),
+              SizedBox(width: 10),
+
+              Icon(Icons.circle, size: 10, color: Colors.blue),
+              SizedBox(width: 5),
+              Text("P4"),
+            ],
+          )
         ],
       ),
     );
   }
 
-// Map colors based on slot name (P1, P2, P3, P4)
-  Color _getColorForSlotName(String slotName) {
-    switch (slotName) {
-      case "P1":
-        return Colors.red;
-      case "P2":
-        return Colors.green;
-      case "P3":
-        return Colors.orange;
-      case "P4":
-        return Colors.blue;
-      default:
-        return Colors.grey;
-    }
-  }
 
-  Widget _usageCard(List usageByHour) {
-    // Safely convert to double
-    final values = usageByHour.map<double>((h) {
-      if (h['events'] is int) return (h['events'] as int).toDouble();
-      if (h['events'] is double) return h['events'];
-      return 0.0;
-    }).toList();
-
+  Widget _usageCard() {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -255,6 +218,13 @@ class _HistoryReportsPageState extends State<HistoryReportsPage> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12.withOpacity(0.05),
+            spreadRadius: 1,
+            blurRadius: 6,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -264,25 +234,31 @@ class _HistoryReportsPageState extends State<HistoryReportsPage> {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          SizedBox(
+
+          Container(
             height: 140,
             child: CustomPaint(
               size: const Size(double.infinity, 120),
-              painter: _BarGraphPainter(values),
+              painter: _BarGraphPainter(),
             ),
           ),
+
           const SizedBox(height: 12),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: usageByHour.map<Widget>((h) {
-              return Text(h['hour'].toString(), style: const TextStyle(fontSize: 12));
-            }).toList(),
-          )
+            children: const [
+              Text("6AM", style: TextStyle(fontSize: 12)),
+              Text("9AM", style: TextStyle(fontSize: 12)),
+              Text("11AM", style: TextStyle(fontSize: 12)),
+              Text("12PM", style: TextStyle(fontSize: 12)),
+              Text("6PM", style: TextStyle(fontSize: 12)),
+            ],
+          ),
         ],
       ),
     );
   }
-
 
   Widget _slotCard(String slot, Color color, String status) {
     return Container(
@@ -318,7 +294,7 @@ class _HistoryReportsPageState extends State<HistoryReportsPage> {
     );
   }
 
-  Widget _recentEventsSection(List events) {
+  Widget _recentEventsSection() {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -338,21 +314,22 @@ class _HistoryReportsPageState extends State<HistoryReportsPage> {
           const Text("Recent Events",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 14),
+
           Wrap(
             spacing: 10,
-            children: const [
-              Chip(label: Text("All"), backgroundColor: Colors.blueAccent),
-              Chip(label: Text("Free → Occupied"), backgroundColor: Colors.greenAccent),
-              Chip(label: Text("Occupied → Free"), backgroundColor: Colors.redAccent),
+            children: [
+              Chip(label: const Text("All"), backgroundColor: Colors.blue.shade50),
+              Chip(label: const Text("Free → Occupied"), backgroundColor: Colors.green.shade50),
+              Chip(label: const Text("Occupied → Free"), backgroundColor: Colors.red.shade50),
             ],
           ),
+
           const SizedBox(height: 20),
-          ...events.map((e) {
-            final time = DateTime.parse(e['time']).toLocal();
-            return _eventRow(
-                "${time.hour}:${time.minute.toString().padLeft(2,'0')}",
-                "${e['slotName']} ${e['direction']}");
-          }).toList(),
+          _eventRow("10:45 AM", "A1 became Occupied"),
+          _eventRow("10:47 AM", "A3 became Free"),
+          _eventRow("11:12 AM", "A1 became Free"),
+          _eventRow("12:04 PM", "P3 became Occupied"),
+          _eventRow("1:27 PM", "P2 became Free"),
         ],
       ),
     );
@@ -371,7 +348,7 @@ class _HistoryReportsPageState extends State<HistoryReportsPage> {
   }
 }
 
-// Pie Chart classes
+
 class PieSlice {
   final double percentage;
   final Color color;
@@ -406,58 +383,86 @@ class MultiPieChartPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-// Bar graph
+
 class _BarGraphPainter extends CustomPainter {
-  final List<double> values;
-  _BarGraphPainter(this.values);
+  final List<double> values = [40, 65, 80, 55, 30];
 
   @override
   void paint(Canvas canvas, Size size) {
-    double maxValue = values.isNotEmpty ? values.reduce((a, b) => a > b ? a : b) : 1; // auto-scale
+    const double maxValue = 100;
+
     const double leftPadding = 28;
     const double bottomPadding = 20;
 
     final double chartWidth = size.width - leftPadding;
     final double chartHeight = size.height - bottomPadding;
 
-    final barPaint = Paint()..color = const Color(0xFF4A90E2)..style = PaintingStyle.fill;
-    final gridPaint = Paint()..color = Colors.grey.shade300..strokeWidth = 1;
-    final axisPaint = Paint()..color = Colors.black45..strokeWidth = 1;
+    final barPaint = Paint()
+      ..color = const Color(0xFF4A90E2)
+      ..style = PaintingStyle.fill;
 
-    // Draw Y-axis
-    canvas.drawLine(Offset(leftPadding, 0), Offset(leftPadding, chartHeight), axisPaint);
+    final gridPaint = Paint()
+      ..color = Colors.grey.shade300
+      ..strokeWidth = 1;
 
-    // Draw horizontal grid lines
-    const steps = 5;
-    for (int i = 0; i <= steps; i++) {
-      double y = chartHeight - (i / steps) * chartHeight;
-      canvas.drawLine(Offset(leftPadding, y), Offset(size.width, y), gridPaint);
+    final axisPaint = Paint()
+      ..color = Colors.black45
+      ..strokeWidth = 1;
+
+    // Y-axis
+    canvas.drawLine(
+      Offset(leftPadding, 0),
+      Offset(leftPadding, chartHeight),
+      axisPaint,
+    );
+
+    const steps = [100, 75, 50, 25, 0];
+    for (int i = 0; i < steps.length; i++) {
+      double y = (1 - steps[i] / maxValue) * chartHeight;
+
+      canvas.drawLine(
+        Offset(leftPadding, y),
+        Offset(size.width, y),
+        gridPaint,
+      );
 
       final textPainter = TextPainter(
         text: TextSpan(
-          text: ((i / steps) * maxValue).toStringAsFixed(0),
+          text: steps[i].toString(),
           style: const TextStyle(fontSize: 10, color: Colors.black54),
         ),
         textDirection: TextDirection.ltr,
       );
+
       textPainter.layout();
-      textPainter.paint(canvas, Offset(leftPadding - textPainter.width - 6, y - 6));
+      textPainter.paint(
+          canvas, Offset(leftPadding - textPainter.width - 6, y - 6));
     }
 
-    // Draw bars
     double spacing = chartWidth / values.length;
     double barWidth = spacing * 0.4;
 
     for (int i = 0; i < values.length; i++) {
       double barHeight = (values[i] / maxValue) * chartHeight;
+
       double xCenter = leftPadding + spacing * (i + 0.5);
       double topY = chartHeight - barHeight;
-      Rect rect = Rect.fromLTWH(xCenter - barWidth / 2, topY, barWidth, barHeight);
+
+      Rect rect = Rect.fromLTWH(
+        xCenter - barWidth / 2,
+        topY,
+        barWidth,
+        barHeight,
+      );
+
       canvas.drawRect(rect, barPaint);
     }
 
-    // Draw X-axis
-    canvas.drawLine(Offset(leftPadding, chartHeight), Offset(size.width, chartHeight), axisPaint);
+    canvas.drawLine(
+      Offset(leftPadding, chartHeight),
+      Offset(size.width, chartHeight),
+      axisPaint,
+    );
   }
 
   @override

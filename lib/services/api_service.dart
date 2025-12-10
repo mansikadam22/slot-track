@@ -70,6 +70,26 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>?> getHistoryReports() async {
+    try {
+      final token = await AuthStorage.getToken();
+      final response = await http.get(
+        Uri.parse('$baseUrl/reports'), // replace with your real endpoint
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print("Error fetching history reports: $e");
+      return null;
+    }
+  }
 
 
   static Future<Map<String, dynamic>?> getUserProfile() async {
@@ -152,6 +172,9 @@ class ApiService {
       return null;
     }
   }
+
+
+
 
   static Future<List> getNotifications() async {
     final url = Uri.parse("$baseUrl/notifications");  // or your real path

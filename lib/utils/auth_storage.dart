@@ -7,6 +7,9 @@ class AuthStorage {
   // NEW: ROLE KEY
   static const _roleKey = 'user_role';
 
+  // NEW: LOGIN STATUS KEY
+  static const _loggedInKey = 'logged_in';
+
   // ---------------- TOKEN --------------------
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
@@ -54,5 +57,21 @@ class AuthStorage {
   static Future<void> clearRole() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_roleKey);
+  }
+
+  // ---------------- LOGIN STATUS --------------------
+  static Future<void> setLoggedIn(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_loggedInKey, value);
+  }
+
+  static Future<bool> isLoggedIn() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_loggedInKey) ?? false;
+  }
+
+  static Future<void> clearLoggedIn() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_loggedInKey);
   }
 }
