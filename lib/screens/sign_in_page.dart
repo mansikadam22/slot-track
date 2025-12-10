@@ -1,39 +1,71 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
 import 'login_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'home_screen.dart';
+import '../services/api_service.dart';
 
-
-class SignInScreen extends StatelessWidget {
+class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
+
+  @override
+  State<SignInScreen> createState() => _SignInScreenState();
+}
+
+class _SignInScreenState extends State<SignInScreen> {
+  final nameCtrl = TextEditingController();
+  final phoneCtrl = TextEditingController();
+  final vehicleCtrl = TextEditingController();
+  final emailCtrl = TextEditingController();
+  final passCtrl = TextEditingController();
+
+  bool loading = false;
+
+  void register() async {
+    setState(() => loading = true);
+
+    final result = await ApiService.register(
+      name: nameCtrl.text.trim(),
+      phone: phoneCtrl.text.trim(),
+      email: emailCtrl.text.trim(),
+      vehicleNo: vehicleCtrl.text.trim(),
+      password: passCtrl.text.trim(),
+    );
+
+    setState(() => loading = false);
+
+    if (result != null && result["success"] == true) {
+      // Registration OK → Go to HomeScreen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Registration failed. Check details and try again."),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
       appBar: AppBar(
+        title: const Text("Create Account", style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
-        title: const Text(
-          "Create Account",
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
       ),
 
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 20),
 
-            const SizedBox(height: 15),
-
-            // ---------- WHITE CARD ----------
+            // --- Card ---
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -47,72 +79,37 @@ class SignInScreen extends StatelessWidget {
                   ),
                 ],
               ),
-
               child: Column(
                 children: [
-                  // ---- Name ----
                   TextField(
-                    decoration: InputDecoration(
-                      hintText: "Name",
-                      prefixIcon: const Icon(Icons.person_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                    controller: nameCtrl,
+                    decoration: field("Name", Icons.person_outline),
                   ),
-
                   const SizedBox(height: 15),
 
-                  // ---- Email ----
                   TextField(
-                    decoration: InputDecoration(
-                      hintText: "Email",
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  // ---- Phone Number ----
-                  TextField(
+                    controller: phoneCtrl,
                     keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      hintText: "Phone Number",
-                      prefixIcon: const Icon(Icons.phone_android),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                    decoration: field("Phone No", Icons.phone_android),
                   ),
-
                   const SizedBox(height: 15),
 
-                  // ---- Password ----
                   TextField(
+                    controller: vehicleCtrl,
+                    decoration: field("Vehicle No", Icons.directions_car_outlined),
+                  ),
+                  const SizedBox(height: 15),
+
+                  TextField(
+                    controller: emailCtrl,
+                    decoration: field("Email", Icons.email_outlined),
+                  ),
+                  const SizedBox(height: 15),
+
+                  TextField(
+                    controller: passCtrl,
                     obscureText: true,
-                    decoration: InputDecoration(
-                      hintText: "Password",
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  // ---- Vehicle No ----
-                  TextField(
-                    decoration: InputDecoration(
-                      hintText: "Vehicle No",
-                      prefixIcon: const Icon(Icons.directions_car_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                    decoration: field("Password", Icons.lock_outline),
                   ),
                 ],
               ),
@@ -120,7 +117,6 @@ class SignInScreen extends StatelessWidget {
 
             const SizedBox(height: 25),
 
-            // ---------- REGISTER BUTTON ----------
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -131,59 +127,48 @@ class SignInScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(30),
                   ),
                 ),
-                onPressed: () async {
-                  SharedPreferences prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('isGuest', false);
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                  );
-                },
-                child: const Text(
+                onPressed: loading ? null : register,
+                child: loading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
                   "Register",
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white,
-                  ),
+                  style: TextStyle(fontSize: 18, color: Colors.white),
                 ),
               ),
             ),
 
             const SizedBox(height: 12),
 
-            // ---------- LOGIN REDIRECT ----------
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  "Already have an account?",
-                  style: TextStyle(fontSize: 15),
-                ),
+                const Text("Already have an account?"),
                 const SizedBox(width: 5),
-
                 GestureDetector(
                   onTap: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
                     );
                   },
                   child: const Text(
                     "Login",
-                    style: TextStyle(
-                      color: Color(0xFF0A3D91),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(color: Color(0xFF0A3D91), fontWeight: FontWeight.bold),
                   ),
-                ),
+                )
               ],
             ),
-
-            const SizedBox(height: 20),
           ],
         ),
       ),
+    );
+  }
+
+  InputDecoration field(String hint, IconData icon) {
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: Icon(icon),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 }

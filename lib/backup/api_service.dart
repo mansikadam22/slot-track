@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/auth_storage.dart';
-import 'package:jwt_decoder/jwt_decoder.dart';
-
 
 class ApiService {
   static const baseUrl = 'https://devmindssmartsmsappapi.devminds.co.in';
@@ -30,48 +28,6 @@ class ApiService {
 
   }
 
-  static Future<Map<String, dynamic>?> register({
-    required String name,
-    required String phone,
-    required String email,
-    required String vehicleNo,
-    required String password,
-  }) async {
-    final url = Uri.parse('$baseUrl/auth/register');
-
-    final response = await http.post(
-      url,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "name": name,
-        "phone_no": phone,
-        "email": email,
-        "vehicle_no": vehicleNo,
-        "password": password,
-      }),
-    );
-
-    print("REGISTER STATUS: ${response.statusCode}");
-    print("REGISTER BODY: ${response.body}");
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(response.body);
-
-      // Save token
-      if (data["token"] != null) {
-        await AuthStorage.saveToken(data["token"]);
-      }
-
-      return data;
-    } else {
-      return null;
-    }
-  }
-
-
-
   static Future<Map<String, dynamic>?> getUserProfile() async {
     try {
       final token = await AuthStorage.getToken();
@@ -88,55 +44,46 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
+        // Your old API returns LIST, so take first user
         if (data is List && data.isNotEmpty) {
-          // Decode token to get current user ID
-          final decoded = JwtDecoder.decode(token);
-          final currentUserId = decoded['id'];
-
-          // Find the logged-in user in the list
-          final currentUser = data.firstWhere(
-                (user) => user['id'] == currentUserId,
-            orElse: () => null,
-          );
-
-          if (currentUser != null) {
-            await AuthStorage.saveRole(currentUser["role"]);
-            return currentUser;
-          }
+          return data[0];
         }
         return null;
+      } else {
+        print("Failed to load profile: ${response.body}");
+        return null;
       }
-      return null;
     } catch (e) {
       print("Error in getUserProfile: $e");
       return null;
     }
   }
 
-
   static Future<bool> updateUser(String name, String phone, String email, String vehicle) async {
+    try {
+      final token = await AuthStorage.getToken();
+      if (token == null) return false;
 
-    final token = await AuthStorage.getToken();
+      final response = await http.patch(
+        Uri.parse('$baseUrl/users'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          "name": name,
+          "phone_no": phone,
+          "email_id": email,
+          "vehicle_no": vehicle,
+        }),
+      );
 
-    final url = Uri.parse("$baseUrl/users");
-
-    final response = await http.patch(
-      url,
-      headers: {
-        "Authorization": "Bearer $token",
-        "Content-Type": "application/json"
-      },
-      body: jsonEncode({
-        "name": name,
-        "phone_no": phone,
-        "email": email,
-        "vehicle_no": vehicle
-      }),
-    );
-
-    return response.statusCode == 200;
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Update error: $e");
+      return false;
+    }
   }
-
 
   static Future<Map<String, dynamic>?> getUserById(String userId) async {
     try {
@@ -177,13 +124,13 @@ class ApiService {
   }
 
 
-  static Future<bool> addNotification({ required String name,
+  static Future<bool> addNotification({
+    required String name,
     required String message,
     required int createdBy,
     required String startDate, // ISO string "2025-12-01T00:00:00Z"
     required String endDate,
   }) async {
-
     final token = await AuthStorage.getToken();
     if (token == null) return false;
 

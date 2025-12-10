@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
 class EditProfilePage extends StatefulWidget {
   final String name;
@@ -23,6 +24,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late TextEditingController phoneController;
   late TextEditingController emailController;
   late TextEditingController vehicleController;
+  bool _loading = false;
 
   @override
   void initState() {
@@ -34,6 +36,64 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   @override
+  void dispose() {
+    nameController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
+    vehicleController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onUpdateTap() async {
+    // Basic client-side validation
+    final n = nameController.text.trim();
+    final p = phoneController.text.trim();
+    final e = emailController.text.trim();
+    final v = vehicleController.text.trim();
+
+    if (n.isEmpty || p.isEmpty || e.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill required fields')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final success = await ApiService.updateUser(n, p, e, v);
+
+      if (!mounted) return;
+
+      if (success) {
+        // return simplified keys that ProfilePage expects
+        Navigator.pop(context, {
+          "name": n,
+          "phone": p,
+          "email": e,
+          "vehicle": v,
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Update failed (server response)')),
+        );
+        print('Update failed: Server returned false');
+      }
+    } catch (err, stackTrace) {
+      // Show SnackBar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Update error: $err')),
+      );
+      // Print to console for debugging
+      print('Update exception: $err');
+      print('Stack trace: $stackTrace');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -42,8 +102,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         elevation: 0,
         backgroundColor: Colors.white,
         centerTitle: true,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
+        iconTheme: const IconThemeData(color: Colors.black87),
+        title: const Text(
           "Edit Profile",
           style: TextStyle(
             color: Colors.black,
@@ -54,19 +114,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
       ),
 
       body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Column(
           children: [
-
             // ---------------- PROFILE AVATAR ----------------
             Center(
               child: Stack(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [Colors.blueAccent, Colors.lightBlueAccent],
                       ),
                       boxShadow: [
@@ -83,25 +142,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       child: Icon(Icons.person, size: 70, color: Colors.grey.shade600),
                     ),
                   ),
-
-                  // ---- Small Edit Button ----
-                  // Positioned(
-                  //   right: 6,
-                  //   bottom: 6,
-                  //   child: Container(
-                  //     decoration: BoxDecoration(
-                  //       shape: BoxShape.circle,
-                  //       color: Colors.blueAccent,
-                  //     ),
-                  //     padding: EdgeInsets.all(6),
-                  //     child: Icon(Icons.edit, color: Colors.white, size: 16),
-                  //   ),
-                  // ),
                 ],
               ),
             ),
 
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
 
             // ---------------- INPUT FIELDS ----------------
             _buildLabel("Full Name"),
@@ -130,36 +175,35 @@ class _EditProfilePageState extends State<EditProfilePage> {
               icon: Icons.directions_car,
             ),
 
-            SizedBox(height: 35),
+            const SizedBox(height: 35),
 
             // ---------------- UPDATE BUTTON ----------------
             GestureDetector(
-              onTap: () {
-                Navigator.pop(context, {
-                  "name": nameController.text,
-                  "phone": phoneController.text,
-                  "email": emailController.text,
-                  "vehicle": vehicleController.text,
-                });
-              },
+              onTap: _loading ? null : _onUpdateTap,
               child: Container(
                 width: double.infinity,
                 height: 52,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(
+                  gradient: const LinearGradient(
                     colors: [Colors.blueAccent, Colors.lightBlueAccent],
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.blueAccent.withOpacity(0.3),
                       blurRadius: 10,
-                      offset: Offset(0, 4),
+                      offset: const Offset(0, 4),
                     )
                   ],
                 ),
                 alignment: Alignment.center,
-                child: Text(
+                child: _loading
+                    ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+                    : const Text(
                   "Update",
                   style: TextStyle(
                     color: Colors.white,
@@ -170,7 +214,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ),
             ),
 
-            SizedBox(height: 25),
+            const SizedBox(height: 25),
           ],
         ),
       ),
@@ -202,7 +246,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     TextInputType keyboardType = TextInputType.text,
   }) {
     return Container(
-      margin: EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.blue.shade50.withOpacity(0.2),
         borderRadius: BorderRadius.circular(14),
@@ -211,7 +255,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
             blurRadius: 6,
-            offset: Offset(0, 3),
+            offset: const Offset(0, 3),
           )
         ],
       ),
@@ -220,7 +264,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         keyboardType: keyboardType,
         decoration: InputDecoration(
           prefixIcon: Icon(icon, color: Colors.blueAccent),
-          contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
           border: InputBorder.none,
         ),
       ),

@@ -1,16 +1,8 @@
-// ---------------------------------------------------------------
-//  PROFILE PAGE (Guest Mode UI Improved Only)
-// ---------------------------------------------------------------
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api_service.dart';
 import 'edit_profile.dart';
 import 'login_screen.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:jwt_decoder/jwt_decoder.dart';
-
-
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -20,19 +12,22 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  String name = "Iram Irfan Fakir";
-  String phone = "2342135332";
-  String email = "iramfaki@gmail.com";
-  String vehicle = "MH09";
+  String name = "Loading...";
+  String phone = "";
+  String email = "";
+  String vehicle = "";
 
   bool isGuest = false;
+  bool loadingProfile = true;
 
   @override
   void initState() {
     super.initState();
     _loadUserStatus();
-    fetchUserData(); // <-- Fetch data when screen opens
+    _loadUserProfile();
   }
+
+  // ---------------- LOAD USER STATUS ----------------
   void _loadUserStatus() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -40,40 +35,42 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
-  Future<void> fetchUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token = prefs.getString("token");
-
-    if (token == null) return;
-
-    // Decode token to get user id
-    Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
-    int userId = decodedToken["id"];
+  // ---------------- LOAD API PROFILE ----------------
+  Future<void> _loadUserProfile() async {
+    setState(() {
+      loadingProfile = true;
+    });
 
     try {
-      final url = Uri.parse("https://your-api-url.com/users/$userId");
+      final data = await ApiService.getUserProfile();
 
-      final response = await http.get(url, headers: {
-        "Authorization": "Bearer $token",
-      });
+      if (!mounted) return;
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        if (data is List && data.isNotEmpty) {
-          setState(() {
-            name = data[0]["name"];
-            phone = data[0]["phone_no"].toString();
-            email = data[0]["email_id"];
-            vehicle = data[0]["vehicle_no"] ?? "N/A";
-          });
+      setState(() {
+        if (data != null) {
+          // Use backend keys
+          name = data["name"] ?? "";
+          phone = data["phone_no"] ?? "";
+          email = data["email"] ?? "";
+          vehicle = data["vehicle_no"] ?? "";
+        } else {
+          // No data returned (maybe token missing) — keep defaults
         }
-      }
+        loadingProfile = false;
+      });
     } catch (e) {
-      print("ERROR FETCHING PROFILE DATA: $e");
+      if (!mounted) return;
+      setState(() {
+        loadingProfile = false;
+      });
+      // Show an error so user knows
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load profile: $e')),
+      );
     }
   }
 
+  // ---------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -92,11 +89,13 @@ class _ProfilePageState extends State<ProfilePage> {
             fontWeight: FontWeight.w600,
           ),
         ),
+
         actions: [
           if (!isGuest)
             IconButton(
               icon: const Icon(Icons.edit, color: Colors.black),
               onPressed: () async {
+                // Open edit screen and wait for returned updated data
                 final updatedData = await Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -109,26 +108,35 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 );
 
-                if (updatedData != null) {
+                // If edit returned updated values, update UI instantly
+                if (updatedData != null && updatedData is Map<String, dynamic>) {
                   setState(() {
-                    name = updatedData["name"];
-                    phone = updatedData["phone"];
-                    email = updatedData["email"];
-                    vehicle = updatedData["vehicle"];
+                    name = updatedData["name"] ?? name;
+                    phone = updatedData["phone"] ?? phone;
+                    email = updatedData["email"] ?? email;
+                    vehicle = updatedData["vehicle"] ?? vehicle;
                   });
+
+                  // Optionally show a small confirmation
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Profile updated')),
+                  );
                 }
               },
             )
         ],
       ),
 
-      body: isGuest ? _buildGuestView(context) : _buildUserProfileView(context),
+      // SHOW LOADING
+      body: loadingProfile
+          ? const Center(child: CircularProgressIndicator())
+          : (isGuest
+          ? _buildGuestView(context)
+          : _buildUserProfileView(context)),
     );
   }
 
-  // ---------------------------------------------------------------
-  //                  ⭐ IMPROVED GUEST MODE UI ⭐
-  // ---------------------------------------------------------------
+  // ---------------- GUEST VIEW ----------------
   Widget _buildGuestView(BuildContext context) {
     return Center(
       child: Padding(
@@ -136,25 +144,14 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // SOFT SHADOW ICON
             Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
                 color: Colors.blue.shade50,
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.15),
-                    blurRadius: 25,
-                    spreadRadius: 2,
-                  )
-                ],
               ),
-              child: const Icon(
-                Icons.lock_outline_rounded,
-                size: 70,
-                color: Colors.blueAccent,
-              ),
+              child: const Icon(Icons.lock_outline_rounded,
+                  size: 70, color: Colors.blueAccent),
             ),
 
             const SizedBox(height: 25),
@@ -162,31 +159,24 @@ class _ProfilePageState extends State<ProfilePage> {
             const Text(
               "Guest Mode",
               style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
-              ),
+                  fontSize: 26, fontWeight: FontWeight.w700),
             ),
+
             const SizedBox(height: 10),
 
             const Text(
               "Login to view and update your profile details.",
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-                height: 1.4,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
 
             const SizedBox(height: 35),
 
-            // IMPROVED LOGIN BUTTON
             SizedBox(
               width: 160,
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  elevation: 3,
                   backgroundColor: Colors.blueAccent,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -196,17 +186,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
+                        builder: (_) => const LoginScreen()),
                   );
                 },
                 child: const Text(
                   "Login",
                   style: TextStyle(
-                    fontSize: 17,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
+                      fontSize: 17,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600),
                 ),
               ),
             )
@@ -216,10 +204,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ---------------------------------------------------------------
-  //            (Your original user profile UI below)
-  // ---------------------------------------------------------------
-
+  // ---------------- USER PROFILE VIEW ----------------
   Widget _buildUserProfileView(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -230,18 +215,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
           Container(
             padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Colors.blueAccent, Colors.lightBlueAccent],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
             ),
             child: const CircleAvatar(
               radius: 55,
@@ -257,28 +232,6 @@ class _ProfilePageState extends State<ProfilePage> {
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-
-          const SizedBox(height: 4),
-
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.verified, color: Colors.blueAccent, size: 18),
-                SizedBox(width: 5),
-                Text(
-                  "Smart Parking User",
-                  style: TextStyle(color: Colors.blueAccent, fontSize: 13),
-                ),
-              ],
             ),
           ),
 
@@ -293,21 +246,16 @@ class _ProfilePageState extends State<ProfilePage> {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  "Logout",
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text("Logout",
+                    style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600)),
                 SizedBox(width: 6),
                 Icon(Icons.logout, color: Colors.red, size: 18),
               ],
             ),
           ),
-
-          const SizedBox(height: 30),
         ],
       ),
     );
@@ -319,23 +267,15 @@ class _ProfilePageState extends State<ProfilePage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.blue.shade100, width: 1.3),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        border: Border.all(color: Colors.blue.shade100),
       ),
       child: Column(
         children: [
-          _buildProfileDetail(Icons.phone_in_talk, "Phone Number", phone),
-          const Divider(height: 30, thickness: 0.8),
-          _buildProfileDetail(Icons.email_rounded, "Email", email),
-          const Divider(height: 30, thickness: 0.8),
-          _buildProfileDetail(
-              Icons.directions_car_filled, "Vehicle Number", vehicle),
+          _buildProfileDetail(Icons.phone, "Phone Number", phone),
+          const Divider(height: 30),
+          _buildProfileDetail(Icons.email, "Email", email),
+          const Divider(height: 30),
+          _buildProfileDetail(Icons.car_repair, "Vehicle Number", vehicle),
         ],
       ),
     );
@@ -347,7 +287,7 @@ class _ProfilePageState extends State<ProfilePage> {
         CircleAvatar(
           radius: 22,
           backgroundColor: Colors.blue.shade50,
-          child: Icon(icon, color: Colors.blueAccent, size: 22),
+          child: Icon(icon, color: Colors.blueAccent),
         ),
         const SizedBox(width: 15),
         Expanded(
@@ -360,12 +300,11 @@ class _ProfilePageState extends State<ProfilePage> {
                       color: Colors.grey[600],
                       fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
-              Text(value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  )),
+              Text(
+                value,
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w500),
+              ),
             ],
           ),
         ),
@@ -373,87 +312,35 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  // ---------------- LOGOUT DIALOG ----------------
   void _showLogoutDialog() {
-    showGeneralDialog(
+    showDialog(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: "Logout",
-      barrierColor: Colors.black.withOpacity(0.35),
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (_, __, ___) {
-        return Center(
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 30),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "Logout",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    "Are you sure you want to logout?",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 15, height: 1.4),
-                  ),
-                  const SizedBox(height: 25),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text(
-                          "Cancel",
-                          style: TextStyle(fontSize: 15, color: Colors.black54),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          SharedPreferences prefs =
-                          await SharedPreferences.getInstance();
-                          prefs.clear();
-                          Navigator.pop(context);
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const LoginScreen()),
-                          );
-                        },
-                        child: const Text(
-                          "Logout",
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Colors.red,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                ],
-              ),
-            ),
+      builder: (_) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text("Are you sure you want to logout?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
           ),
-        );
-      },
-      transitionBuilder: (_, anim, __, child) {
-        return Transform.scale(
-          scale: anim.value,
-          child: Opacity(opacity: anim.value, child: child),
-        );
-      },
+          TextButton(
+            onPressed: () async {
+              SharedPreferences prefs =
+              await SharedPreferences.getInstance();
+              await prefs.clear();
+              Navigator.pop(context);
+
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+            child: const Text("Logout",
+                style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -40,6 +40,9 @@ dependencies:
   http: ^1.6.0
   flutter_form_builder: ^10.1.0
   form_builder_validators: ^11.2.0
+  jwt_decoder: ^2.0.1
+  flutter_launcher_icons: ^0.14.4
+
 
 
 
@@ -58,6 +61,12 @@ dev_dependencies:
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+
 
 # The following section is specific to Flutter packages.
 flutter:
