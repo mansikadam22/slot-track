@@ -34,10 +34,12 @@ class _SignInScreenState extends State<SignInScreen> {
 
     if (result != null && result["success"] == true) {
       // Registration OK → Go to HomeScreen
-      Navigator.pushReplacement(
+      Navigator.pushNamedAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        '/home',
+            (route) => false,
       );
+
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

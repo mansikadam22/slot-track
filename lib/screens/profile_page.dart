@@ -80,7 +80,7 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
-        centerTitle: true,
+        // centerTitle: true,
         title: const Text(
           "Profile",
           style: TextStyle(
